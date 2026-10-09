@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>鋼捲規格報價系統 (旗艦完整版)</title>
+  <title>鋼捲規格報價系統 (旗艦修復版)</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -18,6 +18,7 @@
       --text: #1c1c1e;
       --green: #2e7d32;
       --red: #d32f2f;
+      --gray: #8e8e93;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
@@ -133,7 +134,7 @@
       100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
     }
 
-    .base-input-group { display: flex; align-items: center; gap: 8px; }
+    .base-input-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
     .base-input-group label { font-weight: 600; font-size: 14px; white-space: nowrap; }
     .base-input-group input {
       width: 80px; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
@@ -142,6 +143,14 @@
     .btn-action {
       padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border);
       background: #f2f2f7; cursor: pointer; font-size: 13px; font-weight: 500;
+    }
+    .btn-reset {
+      background: #ffebee;
+      color: var(--red);
+      border: 1px solid #ffcdd2;
+    }
+    .btn-reset:hover {
+      background: #ffcdd2;
     }
     .status-msg { width: 100%; font-size: 13px; color: #666; text-align: center; min-height: 18px; word-break: break-all; }
 
@@ -204,6 +213,15 @@
       border-radius: 16px;
       padding: 18px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .section-header label {
+      margin-bottom: 0 !important;
     }
     .form-section { margin-bottom: 16px; }
     .form-section label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #3a3a3c; }
@@ -286,7 +304,6 @@
 <!-- 分頁 1: 拍照 / 語音 多項次直批 -->
 <div id="tab-photo" class="tab-content active">
   <div class="control-panel">
-    <!-- 點擊時主動重置 value，防止第二次選取同張照片不觸發 onchange -->
     <label for="camera-input" class="scan-btn-label" onclick="document.getElementById('camera-input').value = ''">
       📷 拍照 / 上傳單據
     </label>
@@ -299,6 +316,7 @@
       <input type="number" id="global-base" value="73" step="0.5" oninput="updateAllItemsBase(this.value)">
       <button class="btn-action" onclick="addNewManualItem()">+ 新增項次</button>
       <button class="btn-action" onclick="downloadAnnotatedImage()">💾 匯出圖片</button>
+      <button class="btn-action btn-reset" onclick="resetPhotoTab()">🗑️ 重設清空</button>
     </div>
     
     <div class="status-msg" id="status-msg">點擊拍照或語音輸入，AI 將自動辨識規格並於圖片最右方標註 @數字</div>
@@ -321,6 +339,11 @@
 <!-- 分頁 2: 全手機點選輸入格式 -->
 <div id="tab-phone" class="tab-content">
   <div class="mobile-form-container">
+    <div class="section-header">
+      <label style="font-weight: 700; font-size: 16px; color: #1c1c1e;">手機規格試算</label>
+      <button class="btn-action btn-reset" style="padding: 5px 10px; font-size: 12px;" onclick="resetMobileTab()">🔄 重設</button>
+    </div>
+
     <div class="form-section">
       <label>手動輸入 BASE 基價</label>
       <input type="number" id="m-base" class="form-input-lg" value="73" step="0.5" oninput="runMobileCalc()">
@@ -376,6 +399,11 @@
 <!-- 分頁 3: 反推 BASE 計算 -->
 <div id="tab-reverse" class="tab-content">
   <div class="mobile-form-container">
+    <div class="section-header">
+      <label style="font-weight: 700; font-size: 16px; color: #1c1c1e;">反推 BASE 試算</label>
+      <button class="btn-action btn-reset" style="padding: 5px 10px; font-size: 12px;" onclick="resetReverseTab()">🔄 重設</button>
+    </div>
+
     <div class="form-section">
       <label>🎯 客戶成交 / 目標總報價</label>
       <input type="number" id="r-price" class="form-input-lg" style="color: #2e7d32;" value="82" step="0.5" oninput="runReverseCalc()">
@@ -487,9 +515,65 @@ function calculateValues(thick, width, surface, film, base) {
   return { thickAdd, widthAdd, surfaceAdd, filmAdd, total };
 }
 
-// ----------------- 語音模組 (修復 aborted 問題) -----------------
+// ----------------- 重設功能函式 -----------------
+// 重設分頁 1 (拍照直批)
+function resetPhotoTab() {
+  if (currentItems.length > 0 || currentRawImage) {
+    if (!confirm("確定要清空上傳的圖片與所有報價項次嗎？")) return;
+  }
+  currentItems = [];
+  currentRawImage = null;
+  document.getElementById('camera-input').value = '';
+  document.getElementById('global-base').value = '73';
+
+  // 隱藏預覽圖
+  document.getElementById('image-wrapper').style.display = 'none';
+  document.getElementById('preview-img').src = '';
+  document.getElementById('placeholder-text').style.display = 'block';
+  document.getElementById('badges-container').innerHTML = '';
+
+  document.getElementById('status-msg').innerText = "已重設清空。請拍照上傳單據或使用語音輸入。";
+  renderAllPhotoTab();
+}
+
+// 重設分頁 2 (手機點選格式)
+function resetMobileTab() {
+  document.getElementById('m-base').value = '73';
+  document.getElementById('m-width-custom').value = '';
+  mobileState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
+
+  // 更新選取按鈕外觀
+  initMobileTab();
+  updateButtonSelection('#m-width-grid', '5尺');
+  updateButtonSelection('#m-surface-grid', '砂面');
+  updateButtonSelection('#m-film-grid', 'C4');
+
+  runMobileCalc();
+}
+
+// 重設分頁 3 (反推 BASE)
+function resetReverseTab() {
+  document.getElementById('r-price').value = '82';
+  reverseState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
+
+  initReverseTab();
+  updateButtonSelection('#r-width-grid', '5尺');
+  updateButtonSelection('#r-surface-grid', '砂面');
+  updateButtonSelection('#r-film-grid', 'C4');
+
+  runReverseCalc();
+}
+
+function updateButtonSelection(containerSelector, keyword) {
+  document.querySelectorAll(`${containerSelector} .chip-btn`).forEach(b => {
+    b.classList.toggle('selected', b.innerText.includes(keyword));
+  });
+}
+
+// ----------------- 語音模組 -----------------
 let recognition = null;
 let isRecording = false;
+let speechBuffer = "";
 
 function initVoiceRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -499,25 +583,29 @@ function initVoiceRecognition() {
   }
   const rec = new SpeechRecognition();
   rec.lang = 'zh-TW';
-  rec.continuous = false; // 單次辨識最穩定，徹底避免 iOS 卡死
-  rec.interimResults = false;
+  rec.continuous = true;
+  rec.interimResults = true;
 
   rec.onstart = () => {
     isRecording = true;
+    speechBuffer = "";
     const btn = document.getElementById('voice-btn');
     btn.classList.add('recording');
-    btn.innerHTML = '🔴 錄音中... (點擊結束)';
-    document.getElementById('status-msg').innerText = '🎙️ 正在聆聽中... 請說出規格';
+    btn.innerHTML = '🛑 點擊【完成錄音】';
+    document.getElementById('status-msg').innerText = '🎙️ 正在聆聽中... 請說出規格（例如：Base 73 厚度 1.5 5尺 砂面）';
   };
 
   rec.onresult = event => {
-    const transcript = event.results[0][0].transcript;
-    document.getElementById('status-msg').innerText = `🗣️ 辨識語音：「${transcript}」帶入計算中...`;
-    parseSpokenText(transcript);
+    let interimText = '';
+    for (let i = 0; i < event.results.length; i++) {
+      interimText += event.results[i][0].transcript;
+    }
+    speechBuffer = interimText;
+    document.getElementById('status-msg').innerText = `🗣️ 聽到：「${speechBuffer}」... (講完點按鈕完成)`;
   };
 
   rec.onerror = event => {
-    // 忽略 aborted 與 no-speech 事件，避免干擾畫面
+    console.warn("語音事件:", event.error);
     if (event.error !== 'aborted' && event.error !== 'no-speech') {
       document.getElementById('status-msg').innerText = `語音提示: ${event.error}`;
     }
@@ -525,8 +613,11 @@ function initVoiceRecognition() {
   };
 
   rec.onend = () => {
+    if (speechBuffer.trim()) {
+      parseSpokenText(speechBuffer);
+      speechBuffer = "";
+    }
     stopVoiceRecording();
-    recognition = null; // 每次釋放實例
   };
 
   return rec;
@@ -534,7 +625,22 @@ function initVoiceRecognition() {
 
 function toggleVoiceInput() {
   if (isRecording) {
-    if (recognition) recognition.stop();
+    const textToProcess = speechBuffer.trim();
+    if (recognition) {
+      try {
+        recognition.abort();
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+    stopVoiceRecording();
+
+    if (textToProcess) {
+      parseSpokenText(textToProcess);
+      speechBuffer = "";
+    } else {
+      document.getElementById('status-msg').innerText = "未接收到清晰語音，請再試一次";
+    }
   } else {
     recognition = initVoiceRecognition();
     if (recognition) {
@@ -551,8 +657,11 @@ function toggleVoiceInput() {
 function stopVoiceRecording() {
   isRecording = false;
   const btn = document.getElementById('voice-btn');
-  btn.classList.remove('recording');
-  btn.innerHTML = '🎙️ 點擊語音輸入';
+  if (btn) {
+    btn.classList.remove('recording');
+    btn.innerHTML = '🎙️ 點擊語音輸入';
+  }
+  recognition = null;
 }
 
 function parseSpokenText(text) {
@@ -605,7 +714,7 @@ function parseSpokenText(text) {
   renderAllPhotoTab();
 }
 
-// ----------------- 分頁 1 局部更新 (解決鍵盤縮起問題) -----------------
+// ----------------- 分頁 1 局部渲染 -----------------
 function renderAllPhotoTab() {
   renderRightCards();
   renderImageBadges();
