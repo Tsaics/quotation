@@ -319,7 +319,7 @@
       <button class="btn-action btn-reset" onclick="resetPhotoTab()">🗑️ 重設清空</button>
     </div>
     
-    <div class="status-msg" id="status-msg">點擊拍照或語音輸入，AI 將自動辨識規格並於圖片最右方標註 @數字</div>
+    <div class="status-msg" id="status-msg">可依「厚度、寬度、表面、貼膜、BASE」順序說出（不強制），講完點完成即可帶入</div>
   </div>
 
   <div class="main-workspace">
@@ -516,7 +516,6 @@ function calculateValues(thick, width, surface, film, base) {
 }
 
 // ----------------- 重設功能函式 -----------------
-// 重設分頁 1 (拍照直批)
 function resetPhotoTab() {
   if (currentItems.length > 0 || currentRawImage) {
     if (!confirm("確定要清空上傳的圖片與所有報價項次嗎？")) return;
@@ -526,7 +525,6 @@ function resetPhotoTab() {
   document.getElementById('camera-input').value = '';
   document.getElementById('global-base').value = '73';
 
-  // 隱藏預覽圖
   document.getElementById('image-wrapper').style.display = 'none';
   document.getElementById('preview-img').src = '';
   document.getElementById('placeholder-text').style.display = 'block';
@@ -536,13 +534,11 @@ function resetPhotoTab() {
   renderAllPhotoTab();
 }
 
-// 重設分頁 2 (手機點選格式)
 function resetMobileTab() {
   document.getElementById('m-base').value = '73';
   document.getElementById('m-width-custom').value = '';
   mobileState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
 
-  // 更新選取按鈕外觀
   initMobileTab();
   updateButtonSelection('#m-width-grid', '5尺');
   updateButtonSelection('#m-surface-grid', '砂面');
@@ -551,7 +547,6 @@ function resetMobileTab() {
   runMobileCalc();
 }
 
-// 重設分頁 3 (反推 BASE)
 function resetReverseTab() {
   document.getElementById('r-price').value = '82';
   reverseState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
@@ -570,10 +565,13 @@ function updateButtonSelection(containerSelector, keyword) {
   });
 }
 
-// ----------------- 語音模組 -----------------
+// ========================================================
+// 語音辨識模組 (高精確解析：支援 厚度->寬度->表面->貼膜->BASE 順序優先匹配與口語正規化)
+// ========================================================
 let recognition = null;
 let isRecording = false;
 let speechBuffer = "";
+let hasProcessed = false; // 防重複結算旗標
 
 function initVoiceRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -589,10 +587,13 @@ function initVoiceRecognition() {
   rec.onstart = () => {
     isRecording = true;
     speechBuffer = "";
+    hasProcessed = false;
     const btn = document.getElementById('voice-btn');
-    btn.classList.add('recording');
-    btn.innerHTML = '🛑 點擊【完成錄音】';
-    document.getElementById('status-msg').innerText = '🎙️ 正在聆聽中... 請說出規格（例如：Base 73 厚度 1.5 5尺 砂面）';
+    if (btn) {
+      btn.classList.add('recording');
+      btn.innerHTML = '🛑 點擊【完成錄音】';
+    }
+    document.getElementById('status-msg').innerText = '🎙️ 正在聆聽... 可依「厚度、寬度、表面、貼膜、BASE」順序說出（不強制）';
   };
 
   rec.onresult = event => {
@@ -613,7 +614,9 @@ function initVoiceRecognition() {
   };
 
   rec.onend = () => {
-    if (speechBuffer.trim()) {
+    // 只有在尚未手動結算過時才由 onend 結算
+    if (!hasProcessed && speechBuffer.trim()) {
+      hasProcessed = true;
       parseSpokenText(speechBuffer);
       speechBuffer = "";
     }
@@ -625,10 +628,13 @@ function initVoiceRecognition() {
 
 function toggleVoiceInput() {
   if (isRecording) {
+    // 使用者手動點擊「完成/結束」
     const textToProcess = speechBuffer.trim();
+    hasProcessed = true; // 標記已手動處理，防止 onend 重複解析
+
     if (recognition) {
       try {
-        recognition.abort();
+        recognition.stop(); // 正常關閉串流，不要使用 abort()
       } catch (e) {
         console.warn(e);
       }
@@ -642,15 +648,24 @@ function toggleVoiceInput() {
       document.getElementById('status-msg').innerText = "未接收到清晰語音，請再試一次";
     }
   } else {
-    recognition = initVoiceRecognition();
+    // 啟動前確保舊實例完全釋放
     if (recognition) {
-      try {
-        recognition.start();
-      } catch (e) {
-        console.warn(e);
-        stopVoiceRecording();
-      }
+      try { recognition.abort(); } catch (e) {}
+      recognition = null;
     }
+    
+    // 延遲 50ms 啟動，給予 iOS Safari 釋放音訊硬體的時間
+    setTimeout(() => {
+      recognition = initVoiceRecognition();
+      if (recognition) {
+        try {
+          recognition.start();
+        } catch (e) {
+          console.warn("啟動異常:", e);
+          stopVoiceRecording();
+        }
+      }
+    }, 50);
   }
 }
 
@@ -664,53 +679,166 @@ function stopVoiceRecording() {
   recognition = null;
 }
 
+// 語音中文與同音詞正規化轉換
+function normalizeSpeechText(raw) {
+  let s = raw.toUpperCase()
+    // 標點符號與多餘空白處理
+    .replace(/[,，。、！？!?:：]/g, ' ')
+    // 點數轉換
+    .replace(/點/g, '.')
+    // 中文小數與數字轉換
+    .replace(/零/g, '0')
+    .replace(/一/g, '1')
+    .replace(/二|兩/g, '2')
+    .replace(/三/g, '3')
+    .replace(/四/g, '4')
+    .replace(/五/g, '5')
+    .replace(/六/g, '6')
+    .replace(/七/g, '7')
+    .replace(/八/g, '8')
+    .replace(/九/g, '9')
+    .replace(/十/g, '10')
+    // 尺 / 呎 / 米
+    .replace(/5呎/g, '5尺').replace(/4呎/g, '4尺').replace(/1米/g, '1米')
+    // 語音同音詞替換
+    .replace(/貝斯|背斯|背思|背司|倍思|倍斯/g, 'BASE')
+    .replace(/吸四|西四|C 4/g, 'C4')
+    .replace(/吸六|西六|C 6/g, 'C6')
+    .replace(/B A|逼A|B-A/g, 'BA')
+    .replace(/2 B|二B|2-B/g, '2B')
+    .replace(/光纖膜/g, '雷射膜');
+  return s;
+}
+
+// 核心解析邏輯：優先比對「厚度 ➔ 寬度 ➔ 表面 ➔ 貼膜 ➔ BASE」，亦支援自由亂序
 function parseSpokenText(text) {
-  const upper = text.toUpperCase().replace(/\s+/g, '');
+  let cleaned = normalizeSpeechText(text);
   const globalBaseInput = document.getElementById('global-base');
 
   let baseVal = parseFloat(globalBaseInput.value) || 73;
   let steelVal = "304";
-  let thickVal = "1";
-  let widthVal = 1220;
-  let surfaceVal = "BA";
-  let filmVal = "不貼";
+  let thickVal = null;
+  let widthVal = null;
+  let surfaceVal = null;
+  let filmVal = null;
 
-  const baseMatch = upper.match(/(?:BASE|基價|底價|單價)(\d+\.?\d*)/);
-  if (baseMatch) {
-    baseVal = parseFloat(baseMatch[1]);
-    globalBaseInput.value = baseVal;
+  // 1. 鋼種識別
+  if (cleaned.includes("NO1") || cleaned.includes("NO.1") || cleaned.includes("黑皮")) {
+    steelVal = "NO1";
+  } else if (cleaned.includes("304")) {
+    steelVal = "304";
   }
 
-  if (upper.includes("NO1") || upper.includes("NO.1") || upper.includes("黑皮")) steelVal = "NO1";
-  else if (upper.includes("304")) steelVal = "304";
-
-  if (upper.includes("5尺") || upper.includes("5呎") || upper.includes("五尺") || upper.includes("1550")) widthVal = 1550;
-  else if (upper.includes("4尺") || upper.includes("4呎") || upper.includes("四尺") || upper.includes("1220")) widthVal = 1220;
-  else if (upper.includes("1米") || upper.includes("一米") || upper.includes("1000")) widthVal = 1000;
-
-  const tMatch = upper.match(/(?:厚度|厚)?(\d+\.?\d*)/);
-  if (tMatch && DB.thickList.includes(tMatch[1])) thickVal = tMatch[1];
-  else {
-    for (let i = DB.thickList.length - 1; i >= 0; i--) {
-      const t = DB.thickList[i];
-      if (upper.includes(t)) { thickVal = t; break; }
+  // 2. 依指定順序第 1 項：厚度 (Thick)
+  // (A) 明確關鍵字匹配：例如「厚度1.5」、「厚0.8」
+  const explicitThick = cleaned.match(/(?:厚度|厚)\s*([0-3](?:\.\d{1,2})?)/);
+  if (explicitThick) {
+    let t = parseFloat(explicitThick[1]).toString();
+    if (DB.thickList.includes(t)) {
+      thickVal = t;
+      cleaned = cleaned.replace(explicitThick[0], ' '); // 消耗已配對詞，防止干擾後續數字
     }
   }
 
-  if (upper.includes("砂面") || upper.includes("HLON") || upper.includes("HL") || upper.includes("拋砂") || upper.includes("毛絲面")) surfaceVal = "砂面";
-  else if (upper.includes("BA") || upper.includes("亮面")) surfaceVal = "BA";
-  else if (upper.includes("2B") || upper.includes("霧面")) surfaceVal = "2B";
+  // 3. 依指定順序第 2 項：寬度 (Width)
+  // (A) 尺寸關鍵字匹配：五尺、四尺、一米
+  if (cleaned.includes("5尺") || cleaned.includes("五尺")) {
+    widthVal = 1550;
+    cleaned = cleaned.replace(/5尺|五尺/g, ' ');
+  } else if (cleaned.includes("4尺") || cleaned.includes("四尺")) {
+    widthVal = 1220;
+    cleaned = cleaned.replace(/4尺|四尺/g, ' ');
+  } else if (cleaned.includes("1米") || cleaned.includes("一米")) {
+    widthVal = 1000;
+    cleaned = cleaned.replace(/1米|一米/g, ' ');
+  } else {
+    // (B) 明確毫米寬度：例如「寬度1550」、「寬1220」或 1000~1580 間的 4 位數
+    const explicitWidth = cleaned.match(/(?:寬度|寬|尺寸)?\s*(1[0-5]\d{2})/);
+    if (explicitWidth) {
+      widthVal = parseInt(explicitWidth[1]);
+      cleaned = cleaned.replace(explicitWidth[0], ' ');
+    }
+  }
 
-  if (upper.includes("雷射膜") || upper.includes("雷射") || upper.includes("C6")) filmVal = "C6";
-  else if (upper.includes("保護膜") || upper.includes("藍膜") || upper.includes("C4")) filmVal = "C4";
+  // 4. 依指定順序第 3 項：表面 (Surface)
+  if (cleaned.includes("砂面") || cleaned.includes("HLON") || cleaned.includes("HL") || cleaned.includes("拋砂") || cleaned.includes("毛絲面") || cleaned.includes("拉絲")) {
+    surfaceVal = "砂面";
+    cleaned = cleaned.replace(/砂面|HLON|HL|拋砂|毛絲面|拉絲/g, ' ');
+  } else if (cleaned.includes("BA") || cleaned.includes("亮面")) {
+    surfaceVal = "BA";
+    cleaned = cleaned.replace(/BA|亮面/g, ' ');
+  } else if (cleaned.includes("2B") || cleaned.includes("霧面")) {
+    surfaceVal = "2B";
+    cleaned = cleaned.replace(/2B|霧面/g, ' ');
+  }
 
-  if (surfaceVal === "砂面" && filmVal === "不貼") filmVal = "C4";
+  // 5. 依指定順序第 4 項：貼膜 (Film)
+  if (cleaned.includes("雷射膜") || cleaned.includes("雷射") || cleaned.includes("C6")) {
+    filmVal = "C6";
+    cleaned = cleaned.replace(/雷射膜|雷射|C6/g, ' ');
+  } else if (cleaned.includes("保護膜") || cleaned.includes("藍膜") || cleaned.includes("C4")) {
+    filmVal = "C4";
+    cleaned = cleaned.replace(/保護膜|藍膜|C4/g, ' ');
+  } else if (cleaned.includes("不貼") || cleaned.includes("無膜") || cleaned.includes("素面")) {
+    filmVal = "不貼";
+    cleaned = cleaned.replace(/不貼|無膜|素面/g, ' ');
+  }
 
+  // 6. 依指定順序第 5 項：BASE 基價
+  const explicitBase = cleaned.match(/(?:BASE|基價|底價|單價)\s*(\d{2}(?:\.\d)?)/);
+  if (explicitBase) {
+    baseVal = parseFloat(explicitBase[1]);
+    globalBaseInput.value = baseVal;
+    cleaned = cleaned.replace(explicitBase[0], ' ');
+  }
+
+  // --- 寬鬆容錯：若使用者沒說關鍵字前綴（例如只說「1.5 1550 砂面 C4 74」），從剩餘 token 辨別 ---
+  const remainingTokens = cleaned.match(/\d+(?:\.\d+)?/g) || [];
+
+  for (let token of remainingTokens) {
+    const num = parseFloat(token);
+
+    // 尚未識別厚度，且數字符合厚度規格清單
+    if (!thickVal && DB.thickList.includes(token)) {
+      thickVal = token;
+      continue;
+    }
+    // 尚未識別寬度，且為千位數
+    if (!widthVal && num >= 900 && num <= 1600) {
+      widthVal = Math.round(num);
+      continue;
+    }
+    // 尚未識別 BASE，且落在合理基價範圍 (50 ~ 120)
+    if (num >= 50 && num <= 130) {
+      baseVal = num;
+      globalBaseInput.value = baseVal;
+      continue;
+    }
+  }
+
+  // 預設防呆回退值
+  if (!thickVal) thickVal = "1";
+  if (!widthVal) widthVal = 1220;
+  if (!surfaceVal) surfaceVal = "BA";
+  if (!filmVal) filmVal = "不貼";
+
+  // 規則防護：判斷為砂面但未指定貼膜，自動預設為 C4
+  if (surfaceVal === "砂面" && filmVal === "不貼") {
+    filmVal = "C4";
+  }
+
+  // 新增項次至列表
   currentItems.push({
-    steel: steelVal, thick: thickVal, width: widthVal, surface: surfaceVal, film: filmVal, base: baseVal, y_percent: null
+    steel: steelVal,
+    thick: thickVal,
+    width: widthVal,
+    surface: surfaceVal,
+    film: filmVal,
+    base: baseVal,
+    y_percent: null
   });
 
-  document.getElementById('status-msg').innerText = `✅ 語音帶入成功！項次 #${currentItems.length}：${thickVal}mm / ${widthVal} / ${surfaceVal} / ${filmVal}`;
+  document.getElementById('status-msg').innerText = `✅ 語音辨識完成！項次 #${currentItems.length}：${thickVal}mm / ${widthVal}寬 / ${surfaceVal} / ${filmVal} / BASE:${baseVal}`;
   renderAllPhotoTab();
 }
 
