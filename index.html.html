@@ -571,6 +571,7 @@ function updateButtonSelection(containerSelector, keyword) {
 let recognition = null;
 let isRecording = false;
 let speechBuffer = "";
+let hasProcessed = false; // 防重複結算旗標
 
 function initVoiceRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -586,9 +587,12 @@ function initVoiceRecognition() {
   rec.onstart = () => {
     isRecording = true;
     speechBuffer = "";
+    hasProcessed = false;
     const btn = document.getElementById('voice-btn');
-    btn.classList.add('recording');
-    btn.innerHTML = '🛑 點擊【完成錄音】';
+    if (btn) {
+      btn.classList.add('recording');
+      btn.innerHTML = '🛑 點擊【完成錄音】';
+    }
     document.getElementById('status-msg').innerText = '🎙️ 正在聆聽... 可依「厚度、寬度、表面、貼膜、BASE」順序說出（不強制）';
   };
 
@@ -610,7 +614,9 @@ function initVoiceRecognition() {
   };
 
   rec.onend = () => {
-    if (speechBuffer.trim()) {
+    // 只有在尚未手動結算過時才由 onend 結算
+    if (!hasProcessed && speechBuffer.trim()) {
+      hasProcessed = true;
       parseSpokenText(speechBuffer);
       speechBuffer = "";
     }
@@ -622,10 +628,13 @@ function initVoiceRecognition() {
 
 function toggleVoiceInput() {
   if (isRecording) {
+    // 使用者手動點擊「完成/結束」
     const textToProcess = speechBuffer.trim();
+    hasProcessed = true; // 標記已手動處理，防止 onend 重複解析
+
     if (recognition) {
       try {
-        recognition.abort();
+        recognition.stop(); // 正常關閉串流，不要使用 abort()
       } catch (e) {
         console.warn(e);
       }
@@ -639,15 +648,24 @@ function toggleVoiceInput() {
       document.getElementById('status-msg').innerText = "未接收到清晰語音，請再試一次";
     }
   } else {
-    recognition = initVoiceRecognition();
+    // 啟動前確保舊實例完全釋放
     if (recognition) {
-      try {
-        recognition.start();
-      } catch (e) {
-        console.warn(e);
-        stopVoiceRecording();
-      }
+      try { recognition.abort(); } catch (e) {}
+      recognition = null;
     }
+    
+    // 延遲 50ms 啟動，給予 iOS Safari 釋放音訊硬體的時間
+    setTimeout(() => {
+      recognition = initVoiceRecognition();
+      if (recognition) {
+        try {
+          recognition.start();
+        } catch (e) {
+          console.warn("啟動異常:", e);
+          stopVoiceRecording();
+        }
+      }
+    }, 50);
   }
 }
 
