@@ -309,7 +309,7 @@
     </label>
     <input type="file" id="camera-input" accept="image/*" style="position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none;" onchange="handleImageUpload(this)">
 
-    <button id="voice-btn" class="voice-btn" onclick="toggleVoiceInput()">🎙️ 點擊語音輸入</button>
+    <button id="voice-btn" class="voice-btn" onclick="toggleVoiceInput()">🎙️ 點擊語音輸入 (Gemini AI)</button>
 
     <div class="base-input-group">
       <label>BASE 基價：</label>
@@ -319,7 +319,7 @@
       <button class="btn-action btn-reset" onclick="resetPhotoTab()">🗑️ 重設清空</button>
     </div>
     
-    <div class="status-msg" id="status-msg">可依「厚度、寬度、表面、貼膜、BASE」順序說出（不強制），講完點完成即可帶入</div>
+    <div class="status-msg" id="status-msg">點擊「🎙️ 點擊語音輸入」錄音，講完再點一次，由 Gemini AI 直接精準解析！</div>
   </div>
 
   <div class="main-workspace">
@@ -461,8 +461,8 @@ const DB = {
   thick2B: { "0.3":10, "0.35":9, "0.4":7, "0.45":7, "0.5":6, "0.55":6, "0.6":5, "0.7":5, "0.8":4, "0.9":4, "1":3, "1.2":2, "1.5":1, "2":0, "2.5":0, "3":0 },
   sandC4: { "0.6":6, "0.7":5, "0.8":4, "1":3, "1.2":3, "1.5":2, "2":2, "2.5":2, "3":2 },
   sandC6: { "0.6":12, "0.7":10, "0.8":8, "1":6, "1.2":6, "1.5":4, "2":4, "2.5":4, "3":4 },
-  baFilmC4: { "0.4":6, "0.5":5, "0.6":4, "0.7":4, "0.8":3, "1":2, "1.2":2, "1.5":2, "2":1, "2.5":1, "3":1 },
-  baFilmC6: { "0.4":12, "0.5":10, "0.6":8, "0.7":8, "0.8":6, "1":4, "1.2":4, "1.5":4, "2":2, "2.5":2, "3":2 },
+  baFilmC4: { "0.4":6, "0.5":5, "0.6":4, "0.7":4, "0.8":3, "1":2, "1.2":2, "1.5":1.5, "2":1, "2.5":1, "3":1 },
+  baFilmC6: { "0.4":12, "0.5":10, "0.6":8, "0.7":8, "0.8":6, "1":4, "1.2":4, "1.5":3, "2":2, "2.5":2, "3":2 },
   baSurface: { "0.3":3, "0.35":3, "0.4":3, "0.45":3, "0.5":3, "0.55":3, "0.6":3, "0.7":3, "0.8":3, "0.9":3, "1":3, "1.2":3, "1.5":3, "2":4 },
   width5ft: { "0.3":3, "0.35":3, "0.4":3, "0.45":3, "0.5":3, "0.55":3, "0.6":3, "0.7":1, "0.8":1, "0.9":1, "1":1, "1.2":1, "1.5":1, "2":1, "2.5":1, "3":1 },
   width1m: { "0.3":1, "0.35":1, "0.4":1, "0.45":1, "0.5":1, "0.55":1, "0.6":1, "0.7":1, "0.8":1, "0.9":1, "1":1, "1.2":1, "1.5":1, "2":1, "2.5":1, "3":1 }
@@ -566,279 +566,198 @@ function updateButtonSelection(containerSelector, keyword) {
 }
 
 // ========================================================
-// 語音辨識模組 (高精確解析：支援 厚度->寬度->表面->貼膜->BASE 順序優先匹配與口語正規化)
+// 升級：Gemini 雲端多模態語音辨識模組
 // ========================================================
-let recognition = null;
-let isRecording = false;
-let speechBuffer = "";
-let hasProcessed = false; // 防重複結算旗標
+let mediaRecorder = null;
+let audioChunks = [];
+let isVoiceRecording = false;
+let audioStream = null;
 
-function initVoiceRecognition() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    alert("您的瀏覽器暫不支援語音辨識，請使用 iPhone Safari 或 Chrome 最新版本！");
-    return null;
+async function toggleVoiceInput() {
+  const btn = document.getElementById('voice-btn');
+  const statusEl = document.getElementById('status-msg');
+  const apiKey = (localStorage.getItem('GEMINI_API_KEY') || '').trim();
+
+  if (!apiKey) {
+    alert("請先點選右上角『⚙️ 設定 Gemini API Key』輸入您的 Key！");
+    setApiKey();
+    return;
   }
-  const rec = new SpeechRecognition();
-  rec.lang = 'zh-TW';
-  rec.continuous = true;
-  rec.interimResults = true;
 
-  rec.onstart = () => {
-    isRecording = true;
-    speechBuffer = "";
-    hasProcessed = false;
-    const btn = document.getElementById('voice-btn');
-    if (btn) {
+  if (isVoiceRecording) {
+    // 停止錄音並觸發 Gemini 雲端分析
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    isVoiceRecording = false;
+    btn.classList.remove('recording');
+    btn.innerHTML = '⏳ 正在由 Gemini 雲端辨識中...';
+    statusEl.innerText = '🤖 錄音完成，正在由 Gemini 雲端 AI 高精確辨識規格與鋼鐵術語...';
+  } else {
+    // 啟動錄音
+    try {
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks = [];
+
+      // 優先選擇 iOS / Safari 相容格式，若無則回退預設
+      let mimeType = 'audio/webm';
+      if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        mimeType = 'audio/mp4';
+      } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+        mimeType = 'audio/aac';
+      }
+
+      mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
+
+      mediaRecorder.ondataavailable = event => {
+        if (event.data && event.data.size > 0) {
+          audioChunks.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        // 釋放麥克風
+        if (audioStream) {
+          audioStream.getTracks().forEach(track => track.stop());
+          audioStream = null;
+        }
+
+        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
+        if (audioBlob.size < 1000) {
+          statusEl.innerText = "❌ 錄音時間過短，請再試一次";
+          btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+          return;
+        }
+
+        try {
+          // 將音訊 Blob 轉 Base64
+          const base64Audio = await blobToBase64(audioBlob);
+          const mime = audioBlob.type.split(';')[0] || 'audio/mp4';
+
+          await processAudioWithGemini(base64Audio, mime, apiKey);
+        } catch (err) {
+          statusEl.innerText = `❌ Gemini 雲端語音辨識失敗: ${err.message}`;
+          console.error(err);
+        } finally {
+          btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+        }
+      };
+
+      mediaRecorder.start();
+      isVoiceRecording = true;
       btn.classList.add('recording');
       btn.innerHTML = '🛑 點擊【完成錄音】';
+      statusEl.innerText = '🎙️ 正在聆聽中... 可依「厚度、寬度、表面、貼膜、BASE」說出規格，講完點擊完成';
+    } catch (err) {
+      alert("無法存取麥克風，請確認瀏覽器已允許麥克風權限！");
+      console.error(err);
+      statusEl.innerText = "❌ 麥克風啟動失敗";
+      btn.classList.remove('recording');
+      btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+      isVoiceRecording = false;
     }
-    document.getElementById('status-msg').innerText = '🎙️ 正在聆聽... 可依「厚度、寬度、表面、貼膜、BASE」順序說出（不強制）';
-  };
-
-  rec.onresult = event => {
-    let interimText = '';
-    for (let i = 0; i < event.results.length; i++) {
-      interimText += event.results[i][0].transcript;
-    }
-    speechBuffer = interimText;
-    document.getElementById('status-msg').innerText = `🗣️ 聽到：「${speechBuffer}」... (講完點按鈕完成)`;
-  };
-
-  rec.onerror = event => {
-    console.warn("語音事件:", event.error);
-    if (event.error !== 'aborted' && event.error !== 'no-speech') {
-      document.getElementById('status-msg').innerText = `語音提示: ${event.error}`;
-    }
-    stopVoiceRecording();
-  };
-
-  rec.onend = () => {
-    // 只有在尚未手動結算過時才由 onend 結算
-    if (!hasProcessed && speechBuffer.trim()) {
-      hasProcessed = true;
-      parseSpokenText(speechBuffer);
-      speechBuffer = "";
-    }
-    stopVoiceRecording();
-  };
-
-  return rec;
+  }
 }
 
-function toggleVoiceInput() {
-  if (isRecording) {
-    // 使用者手動點擊「完成/結束」
-    const textToProcess = speechBuffer.trim();
-    hasProcessed = true; // 標記已手動處理，防止 onend 重複解析
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result;
+      const base64 = dataUrl.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
-    if (recognition) {
-      try {
-        recognition.stop(); // 正常關閉串流，不要使用 abort()
-      } catch (e) {
-        console.warn(e);
+// 傳送音訊給 Gemini 模型直接理解語音並解析規格
+async function processAudioWithGemini(base64Audio, mimeType, apiKey) {
+  const statusEl = document.getElementById('status-msg');
+  const globalBase = parseFloat(document.getElementById('global-base').value) || 73;
+
+  const prompt = `你是一位鋼材報價專家。請仔細聆聽這段中文語音，語音內容為鋼捲規格報價。
+請辨識使用者說出的規格（可能包含：厚度、寬度、表面、貼膜、BASE基價），並依照下列同義詞轉換規則輸出純 JSON：
+
+同義詞對照規則：
+1. 寬度：5'、5尺、1550 -> 1550；4'、4尺、1220 -> 1220；1米、1000 -> 1000（或是使用者提到的具體毫米數字）
+2. 表面：HLON、HL、砂面、拋砂、毛絲面、拉絲 -> "砂面"；BA、亮面 -> "BA"；2B、霧面 -> "2B"
+3. 貼膜：雷射膜、光纖膜、C6 -> "C6"；保護膜、藍膜、C4 -> "C4"；不貼、無膜、素面 -> "不貼"
+   【重要規則】如果判斷表面是「砂面」，但語音中完全沒提到貼膜或特別標註，請一律將貼膜預設為 "C4"。
+4. 鋼材：304、SUS304 -> "304"；NO1 -> "NO1"
+5. BASE 基價：語音提到的基價、底價或 Base（若未提及則使用 ${globalBase}）。
+
+回傳格式必須且僅為純 JSON 物件（不要包含任何 markdown 標記或文字）：
+{"steel": "304", "thick": "1.5", "width": 1550, "surface": "砂面", "film": "C4", "base": ${globalBase}, "spoken_text": "辨識到的原始文字"}`;
+
+  const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+  let resData = null;
+  let lastError = null;
+
+  for (const model of candidateModels) {
+    try {
+      statusEl.innerText = `⏳ 正在透過 Gemini (${model}) 解析雲端語音...`;
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Audio } }
+            ]
+          }]
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.candidates && data.candidates[0]) {
+        resData = data;
+        break;
+      } else {
+        lastError = data.error ? `${data.error.code}: ${data.error.message}` : `HTTP ${response.status}`;
+        await new Promise(r => setTimeout(r, 400));
       }
-    }
-    stopVoiceRecording();
-
-    if (textToProcess) {
-      parseSpokenText(textToProcess);
-      speechBuffer = "";
-    } else {
-      document.getElementById('status-msg').innerText = "未接收到清晰語音，請再試一次";
-    }
-  } else {
-    // 啟動前確保舊實例完全釋放
-    if (recognition) {
-      try { recognition.abort(); } catch (e) {}
-      recognition = null;
-    }
-    
-    // 延遲 50ms 啟動，給予 iOS Safari 釋放音訊硬體的時間
-    setTimeout(() => {
-      recognition = initVoiceRecognition();
-      if (recognition) {
-        try {
-          recognition.start();
-        } catch (e) {
-          console.warn("啟動異常:", e);
-          stopVoiceRecording();
-        }
-      }
-    }, 50);
-  }
-}
-
-function stopVoiceRecording() {
-  isRecording = false;
-  const btn = document.getElementById('voice-btn');
-  if (btn) {
-    btn.classList.remove('recording');
-    btn.innerHTML = '🎙️ 點擊語音輸入';
-  }
-  recognition = null;
-}
-
-// 語音中文與同音詞正規化轉換
-function normalizeSpeechText(raw) {
-  let s = raw.toUpperCase()
-    // 標點符號與多餘空白處理
-    .replace(/[,，。、！？!?:：]/g, ' ')
-    // 點數轉換
-    .replace(/點/g, '.')
-    // 中文小數與數字轉換
-    .replace(/零/g, '0')
-    .replace(/一/g, '1')
-    .replace(/二|兩/g, '2')
-    .replace(/三/g, '3')
-    .replace(/四/g, '4')
-    .replace(/五/g, '5')
-    .replace(/六/g, '6')
-    .replace(/七/g, '7')
-    .replace(/八/g, '8')
-    .replace(/九/g, '9')
-    .replace(/十/g, '10')
-    // 尺 / 呎 / 米
-    .replace(/5呎/g, '5尺').replace(/4呎/g, '4尺').replace(/1米/g, '1米')
-    // 語音同音詞替換
-    .replace(/貝斯|背斯|背思|背司|倍思|倍斯/g, 'BASE')
-    .replace(/吸四|西四|C 4/g, 'C4')
-    .replace(/吸六|西六|C 6/g, 'C6')
-    .replace(/B A|逼A|B-A/g, 'BA')
-    .replace(/2 B|二B|2-B/g, '2B')
-    .replace(/光纖膜/g, '雷射膜');
-  return s;
-}
-
-// 核心解析邏輯：優先比對「厚度 ➔ 寬度 ➔ 表面 ➔ 貼膜 ➔ BASE」，亦支援自由亂序
-function parseSpokenText(text) {
-  let cleaned = normalizeSpeechText(text);
-  const globalBaseInput = document.getElementById('global-base');
-
-  let baseVal = parseFloat(globalBaseInput.value) || 73;
-  let steelVal = "304";
-  let thickVal = null;
-  let widthVal = null;
-  let surfaceVal = null;
-  let filmVal = null;
-
-  // 1. 鋼種識別
-  if (cleaned.includes("NO1") || cleaned.includes("NO.1") || cleaned.includes("黑皮")) {
-    steelVal = "NO1";
-  } else if (cleaned.includes("304")) {
-    steelVal = "304";
-  }
-
-  // 2. 依指定順序第 1 項：厚度 (Thick)
-  // (A) 明確關鍵字匹配：例如「厚度1.5」、「厚0.8」
-  const explicitThick = cleaned.match(/(?:厚度|厚)\s*([0-3](?:\.\d{1,2})?)/);
-  if (explicitThick) {
-    let t = parseFloat(explicitThick[1]).toString();
-    if (DB.thickList.includes(t)) {
-      thickVal = t;
-      cleaned = cleaned.replace(explicitThick[0], ' '); // 消耗已配對詞，防止干擾後續數字
+    } catch (err) {
+      lastError = err.message;
     }
   }
 
-  // 3. 依指定順序第 2 項：寬度 (Width)
-  // (A) 尺寸關鍵字匹配：五尺、四尺、一米
-  if (cleaned.includes("5尺") || cleaned.includes("五尺")) {
-    widthVal = 1550;
-    cleaned = cleaned.replace(/5尺|五尺/g, ' ');
-  } else if (cleaned.includes("4尺") || cleaned.includes("四尺")) {
-    widthVal = 1220;
-    cleaned = cleaned.replace(/4尺|四尺/g, ' ');
-  } else if (cleaned.includes("1米") || cleaned.includes("一米")) {
-    widthVal = 1000;
-    cleaned = cleaned.replace(/1米|一米/g, ' ');
-  } else {
-    // (B) 明確毫米寬度：例如「寬度1550」、「寬1220」或 1000~1580 間的 4 位數
-    const explicitWidth = cleaned.match(/(?:寬度|寬|尺寸)?\s*(1[0-5]\d{2})/);
-    if (explicitWidth) {
-      widthVal = parseInt(explicitWidth[1]);
-      cleaned = cleaned.replace(explicitWidth[0], ' ');
-    }
+  if (!resData) {
+    throw new Error(`雲端辨識未成功 (${lastError})，請稍候再試`);
   }
 
-  // 4. 依指定順序第 3 項：表面 (Surface)
-  if (cleaned.includes("砂面") || cleaned.includes("HLON") || cleaned.includes("HL") || cleaned.includes("拋砂") || cleaned.includes("毛絲面") || cleaned.includes("拉絲")) {
-    surfaceVal = "砂面";
-    cleaned = cleaned.replace(/砂面|HLON|HL|拋砂|毛絲面|拉絲/g, ' ');
-  } else if (cleaned.includes("BA") || cleaned.includes("亮面")) {
-    surfaceVal = "BA";
-    cleaned = cleaned.replace(/BA|亮面/g, ' ');
-  } else if (cleaned.includes("2B") || cleaned.includes("霧面")) {
-    surfaceVal = "2B";
-    cleaned = cleaned.replace(/2B|霧面/g, ' ');
+  const aiText = resData.candidates[0].content.parts[0].text;
+  const cleanJson = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const parsed = JSON.parse(cleanJson);
+
+  let tStr = parseFloat(parsed.thick || "1").toString();
+  if (!DB.thickList.includes(tStr)) tStr = "1";
+
+  const surface = parsed.surface || "BA";
+  let film = parsed.film || "不貼";
+  if (surface === "砂面" && (!parsed.film || parsed.film === "不貼")) {
+    film = "C4";
   }
 
-  // 5. 依指定順序第 4 項：貼膜 (Film)
-  if (cleaned.includes("雷射膜") || cleaned.includes("雷射") || cleaned.includes("C6")) {
-    filmVal = "C6";
-    cleaned = cleaned.replace(/雷射膜|雷射|C6/g, ' ');
-  } else if (cleaned.includes("保護膜") || cleaned.includes("藍膜") || cleaned.includes("C4")) {
-    filmVal = "C4";
-    cleaned = cleaned.replace(/保護膜|藍膜|C4/g, ' ');
-  } else if (cleaned.includes("不貼") || cleaned.includes("無膜") || cleaned.includes("素面")) {
-    filmVal = "不貼";
-    cleaned = cleaned.replace(/不貼|無膜|素面/g, ' ');
+  const baseVal = parseFloat(parsed.base) || globalBase;
+  if (parsed.base) {
+    document.getElementById('global-base').value = baseVal;
   }
 
-  // 6. 依指定順序第 5 項：BASE 基價
-  const explicitBase = cleaned.match(/(?:BASE|基價|底價|單價)\s*(\d{2}(?:\.\d)?)/);
-  if (explicitBase) {
-    baseVal = parseFloat(explicitBase[1]);
-    globalBaseInput.value = baseVal;
-    cleaned = cleaned.replace(explicitBase[0], ' ');
-  }
-
-  // --- 寬鬆容錯：若使用者沒說關鍵字前綴（例如只說「1.5 1550 砂面 C4 74」），從剩餘 token 辨別 ---
-  const remainingTokens = cleaned.match(/\d+(?:\.\d+)?/g) || [];
-
-  for (let token of remainingTokens) {
-    const num = parseFloat(token);
-
-    // 尚未識別厚度，且數字符合厚度規格清單
-    if (!thickVal && DB.thickList.includes(token)) {
-      thickVal = token;
-      continue;
-    }
-    // 尚未識別寬度，且為千位數
-    if (!widthVal && num >= 900 && num <= 1600) {
-      widthVal = Math.round(num);
-      continue;
-    }
-    // 尚未識別 BASE，且落在合理基價範圍 (50 ~ 120)
-    if (num >= 50 && num <= 130) {
-      baseVal = num;
-      globalBaseInput.value = baseVal;
-      continue;
-    }
-  }
-
-  // 預設防呆回退值
-  if (!thickVal) thickVal = "1";
-  if (!widthVal) widthVal = 1220;
-  if (!surfaceVal) surfaceVal = "BA";
-  if (!filmVal) filmVal = "不貼";
-
-  // 規則防護：判斷為砂面但未指定貼膜，自動預設為 C4
-  if (surfaceVal === "砂面" && filmVal === "不貼") {
-    filmVal = "C4";
-  }
-
-  // 新增項次至列表
   currentItems.push({
-    steel: steelVal,
-    thick: thickVal,
-    width: widthVal,
-    surface: surfaceVal,
-    film: filmVal,
+    steel: parsed.steel || "304",
+    thick: tStr,
+    width: parsed.width || 1220,
+    surface: surface,
+    film: film,
     base: baseVal,
     y_percent: null
   });
 
-  document.getElementById('status-msg').innerText = `✅ 語音辨識完成！項次 #${currentItems.length}：${thickVal}mm / ${widthVal}寬 / ${surfaceVal} / ${filmVal} / BASE:${baseVal}`;
+  statusEl.innerText = `✅ Gemini 辨識完成！「${parsed.spoken_text || ''}」➔ 項次 #${currentItems.length}：${tStr}mm / ${parsed.width || 1220}寬 / ${surface} / ${film} / BASE:${baseVal}`;
   renderAllPhotoTab();
 }
 
