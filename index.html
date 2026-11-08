@@ -566,12 +566,28 @@ function updateButtonSelection(containerSelector, keyword) {
 }
 
 // ========================================================
-// 升級：Gemini 雲端多模態語音辨識模組
+// 升級：Gemini 雲端多模態語音辨識模組 (防死鎖強化版)
 // ========================================================
 let mediaRecorder = null;
 let audioChunks = [];
 let isVoiceRecording = false;
 let audioStream = null;
+let isProcessingVoice = false; // 防止重覆點擊並行請求造成死鎖
+
+// 強制徹底釋放麥克風軌道
+function forceStopMediaStream() {
+  if (audioStream) {
+    try {
+      audioStream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+    } catch (e) {
+      console.warn("釋放音訊軌道例外:", e);
+    }
+    audioStream = null;
+  }
+}
 
 async function toggleVoiceInput() {
   const btn = document.getElementById('voice-btn');
@@ -584,80 +600,118 @@ async function toggleVoiceInput() {
     return;
   }
 
+  // 1. 如果正在等待 Gemini API 回傳，禁止重複觸發
+  if (isProcessingVoice) {
+    statusEl.innerText = "⏳ 正在處理上一筆語音，請稍候...";
+    return;
+  }
+
+  // 2. 正在錄音中 -> 使用者點擊【完成錄音】
   if (isVoiceRecording) {
-    // 停止錄音並觸發 Gemini 雲端分析
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-    }
     isVoiceRecording = false;
     btn.classList.remove('recording');
     btn.innerHTML = '⏳ 正在由 Gemini 雲端辨識中...';
-    statusEl.innerText = '🤖 錄音完成，正在由 Gemini 雲端 AI 高精確辨識規格與鋼鐵術語...';
-  } else {
-    // 啟動錄音
-    try {
-      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunks = [];
+    statusEl.innerText = '🤖 錄音完成，正在由 Gemini 雲端 AI 解析規格...';
+    isProcessingVoice = true;
 
-      // 優先選擇 iOS / Safari 相容格式，若無則回退預設
-      let mimeType = 'audio/webm';
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try {
+        mediaRecorder.stop();
+      } catch (err) {
+        console.warn("停止錄音異常:", err);
+      }
+    }
+    return;
+  }
+
+  // 3. 準備啟動錄音 -> 先強制清空上次殘留的硬體連接
+  forceStopMediaStream();
+  mediaRecorder = null;
+  audioChunks = [];
+
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+
+    let mimeType = '';
+    if (typeof MediaRecorder !== 'undefined') {
       if (MediaRecorder.isTypeSupported('audio/mp4')) {
         mimeType = 'audio/mp4';
       } else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
         mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+        mimeType = 'audio/webm';
       } else if (MediaRecorder.isTypeSupported('audio/aac')) {
         mimeType = 'audio/aac';
       }
+    }
 
-      mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
+    mediaRecorder = new MediaRecorder(audioStream, mimeType ? { mimeType } : undefined);
 
-      mediaRecorder.ondataavailable = event => {
-        if (event.data && event.data.size > 0) {
-          audioChunks.push(event.data);
-        }
-      };
+    mediaRecorder.ondataavailable = event => {
+      if (event.data && event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
 
-      mediaRecorder.onstop = async () => {
-        // 釋放麥克風
-        if (audioStream) {
-          audioStream.getTracks().forEach(track => track.stop());
-          audioStream = null;
-        }
+    mediaRecorder.onstop = async () => {
+      // 停止時立刻關閉硬體麥克風
+      forceStopMediaStream();
 
-        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/mp4' });
-        if (audioBlob.size < 1000) {
-          statusEl.innerText = "❌ 錄音時間過短，請再試一次";
-          btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
-          return;
-        }
+      const finalMime = mediaRecorder.mimeType || 'audio/mp4';
+      const audioBlob = new Blob(audioChunks, { type: finalMime });
+      audioChunks = []; // 釋放記憶體
 
-        try {
-          // 將音訊 Blob 轉 Base64
-          const base64Audio = await blobToBase64(audioBlob);
-          const mime = audioBlob.type.split(';')[0] || 'audio/mp4';
+      if (audioBlob.size < 1200) {
+        statusEl.innerText = "❌ 錄音時間過短或未收錄到聲音，請再試一次";
+        btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+        isProcessingVoice = false;
+        return;
+      }
 
-          await processAudioWithGemini(base64Audio, mime, apiKey);
-        } catch (err) {
-          statusEl.innerText = `❌ Gemini 雲端語音辨識失敗: ${err.message}`;
-          console.error(err);
-        } finally {
-          btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
-        }
-      };
+      try {
+        const base64Audio = await blobToBase64(audioBlob);
+        const mimeClean = finalMime.split(';')[0] || 'audio/mp4';
+        await processAudioWithGemini(base64Audio, mimeClean, apiKey);
+      } catch (err) {
+        statusEl.innerText = `❌ Gemini 雲端語音辨識失敗: ${err.message}`;
+        console.error(err);
+      } finally {
+        btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+        isProcessingVoice = false;
+        forceStopMediaStream();
+      }
+    };
 
-      mediaRecorder.start();
-      isVoiceRecording = true;
-      btn.classList.add('recording');
-      btn.innerHTML = '🛑 點擊【完成錄音】';
-      statusEl.innerText = '🎙️ 正在聆聽中... 可依「厚度、寬度、表面、貼膜、BASE」說出規格，講完點擊完成';
-    } catch (err) {
-      alert("無法存取麥克風，請確認瀏覽器已允許麥克風權限！");
-      console.error(err);
-      statusEl.innerText = "❌ 麥克風啟動失敗";
+    mediaRecorder.onerror = err => {
+      console.error("MediaRecorder 錯誤:", err);
+      forceStopMediaStream();
+      isVoiceRecording = false;
+      isProcessingVoice = false;
       btn.classList.remove('recording');
       btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
-      isVoiceRecording = false;
-    }
+    };
+
+    mediaRecorder.start();
+    isVoiceRecording = true;
+    btn.classList.add('recording');
+    btn.innerHTML = '🛑 點擊【完成錄音】';
+    statusEl.innerText = '🎙️ 正在聆聽中... 可依「厚度、寬度、表面、貼膜、BASE」說出規格，講完點擊完成';
+
+  } catch (err) {
+    console.error("麥克風存取失敗:", err);
+    forceStopMediaStream();
+    isVoiceRecording = false;
+    isProcessingVoice = false;
+    btn.classList.remove('recording');
+    btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+    alert("無法存取麥克風，請確認瀏覽器已允許麥克風權限！");
+    statusEl.innerText = "❌ 麥克風啟動失敗，請重新整理網頁後再試";
   }
 }
 
