@@ -415,4 +415,1106 @@
 
     <div class="form-section">
       <label>鋼捲寬度 (mm)</label>
-      <div class="btn-group-grid cols-
+      <div class="btn-group-grid cols-3" id="m-width-grid">
+        <button class="chip-btn selected" onclick="selectMobileWidth(1550, this)">5尺 (1550)</button>
+        <button class="chip-btn" onclick="selectMobileWidth(1220, this)">4尺 (1220)</button>
+        <button class="chip-btn" onclick="selectMobileWidth(1000, this)">1米 (1000)</button>
+      </div>
+      <input type="number" id="m-width-custom" class="form-input-lg" style="margin-top: 8px; font-size: 15px; padding: 10px;" placeholder="其他自訂寬度 (mm)" oninput="selectCustomWidth(this.value)">
+    </div>
+
+    <div class="form-section">
+      <label>表面</label>
+      <div class="btn-group-grid cols-3" id="m-surface-grid">
+        <button class="chip-btn selected" onclick="selectMobileSurface('砂面', this)">砂面</button>
+        <button class="chip-btn" onclick="selectMobileSurface('BA', this)">BA</button>
+        <button class="chip-btn" onclick="selectMobileSurface('2B', this)">2B</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label>貼膜種類 (砂面預設 C4)</label>
+      <div class="btn-group-grid cols-3" id="m-film-grid">
+        <button class="chip-btn selected" onclick="selectMobileFilm('C4', this)">C4 (普通)</button>
+        <button class="chip-btn" onclick="selectMobileFilm('C6', this)">C6 (雷射)</button>
+        <button class="chip-btn" onclick="selectMobileFilm('不貼', this)">不貼</button>
+      </div>
+    </div>
+
+    <div class="result-card-lg">
+      <div class="res-row"><span>BASE 基價：</span><span id="m-res-base">73</span></div>
+      <div class="res-row"><span>厚度加價：</span><span id="m-res-thick">+1</span></div>
+      <div class="res-row"><span>寬度加價：</span><span id="m-res-width">+1</span></div>
+      <div class="res-row"><span>表面加價：</span><span id="m-res-surface">+2</span></div>
+      <div class="res-row"><span>貼膜加價：</span><span id="m-res-film">+0</span></div>
+      <div class="res-total-row">
+        <span>試算總報價：</span>
+        <span class="total-val-huge" id="m-res-total">77</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 分頁 3: 反推 BASE 計算 -->
+<div id="tab-reverse" class="tab-content">
+  <div class="mobile-form-container">
+    <div class="section-header">
+      <label style="font-weight: 700; font-size: 16px;">反推 BASE 試算</label>
+      <button class="btn-action btn-reset" style="padding: 5px 10px; font-size: 12px;" onclick="resetReverseTab()">🔄 重設</button>
+    </div>
+
+    <div class="form-section">
+      <label>🎯 客戶成交 / 目標總報價</label>
+      <input type="number" id="r-price" class="form-input-lg" style="color: var(--green);" value="82" step="0.5" oninput="runReverseCalc()">
+    </div>
+
+    <div class="form-section">
+      <label>厚度 (mm)</label>
+      <div class="btn-group-grid" id="r-thick-grid"></div>
+    </div>
+
+    <div class="form-section">
+      <label>鋼捲寬度 (mm)</label>
+      <div class="btn-group-grid cols-3" id="r-width-grid">
+        <button class="chip-btn selected" onclick="selectReverseWidth(1550, this)">5尺 (1550)</button>
+        <button class="chip-btn" onclick="selectReverseWidth(1220, this)">4尺 (1220)</button>
+        <button class="chip-btn" onclick="selectReverseWidth(1000, this)">1米 (1000)</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label>表面</label>
+      <div class="btn-group-grid cols-3" id="r-surface-grid">
+        <button class="chip-btn selected" onclick="selectReverseSurface('砂面', this)">砂面</button>
+        <button class="chip-btn" onclick="selectReverseSurface('BA', this)">BA</button>
+        <button class="chip-btn" onclick="selectReverseSurface('2B', this)">2B</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <label>貼膜種類 (砂面預設 C4)</label>
+      <div class="btn-group-grid cols-3" id="r-film-grid">
+        <button class="chip-btn selected" onclick="selectReverseFilm('C4', this)">C4 (普通)</button>
+        <button class="chip-btn" onclick="selectReverseFilm('C6', this)">C6 (雷射)</button>
+        <button class="chip-btn" onclick="selectReverseFilm('不貼', this)">不貼</button>
+      </div>
+    </div>
+
+    <div class="result-card-lg reverse-card">
+      <div class="res-row"><span>目標成交價：</span><span id="r-res-price">82</span></div>
+      <div class="res-row"><span>厚度加價：</span><span id="r-res-thick">-1</span></div>
+      <div class="res-row"><span>寬度加價：</span><span id="r-res-width">-1</span></div>
+      <div class="res-row"><span>表面加價：</span><span id="r-res-surface">-2</span></div>
+      <div class="res-row"><span>貼膜加價：</span><span id="r-res-film">-0</span></div>
+      <div class="res-total-row">
+        <span>反推原始 BASE：</span>
+        <span class="base-val-huge" id="r-res-base">78</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 主題切換邏輯 (亮色 / 暗黑模式)
+function initTheme() {
+  const savedTheme = localStorage.getItem('STEEL_QUOTE_THEME');
+  const btn = document.getElementById('theme-btn');
+  if (savedTheme === 'dark') {
+    document.body.classList.add('dark-mode');
+    if (btn) btn.innerHTML = '☀️ 亮色';
+  } else {
+    document.body.classList.remove('dark-mode');
+    if (btn) btn.innerHTML = '🌙 暗黑';
+  }
+}
+
+function toggleTheme() {
+  const isDark = document.body.classList.toggle('dark-mode');
+  const btn = document.getElementById('theme-btn');
+  if (isDark) {
+    localStorage.setItem('STEEL_QUOTE_THEME', 'dark');
+    if (btn) btn.innerHTML = '☀️ 亮色';
+  } else {
+    localStorage.setItem('STEEL_QUOTE_THEME', 'light');
+    if (btn) btn.innerHTML = '🌙 暗黑';
+  }
+}
+
+let DB = {
+  thickList: ["0.3", "0.35", "0.4", "0.45", "0.5", "0.55", "0.6", "0.7", "0.8", "0.9", "1", "1.2", "1.5", "2", "2.5", "3"],
+  thick2B: { "0.3":10, "0.35":9, "0.4":7, "0.45":7, "0.5":6, "0.55":6, "0.6":5, "0.7":5, "0.8":4, "0.9":4, "1":3, "1.2":2, "1.5":1, "2":0, "2.5":0, "3":0 },
+  sandC4: { "0.6":6, "0.7":5, "0.8":4, "1":3, "1.2":3, "1.5":2, "2":2, "2.5":2, "3":2 },
+  sandC6: { "0.6":12, "0.7":10, "0.8":8, "1":6, "1.2":6, "1.5":4, "2":4, "2.5":4, "3":4 },
+  baFilmC4: { "0.4":6, "0.5":5, "0.6":4, "0.7":4, "0.8":3, "1":2, "1.2":2, "1.5":1.5, "2":1, "2.5":1, "3":1 },
+  baFilmC6: { "0.4":12, "0.5":10, "0.6":8, "0.7":8, "0.8":6, "1":4, "1.2":4, "1.5":3, "2":2, "2.5":2, "3":2 },
+  baSurface: { "0.3":3, "0.35":3, "0.4":3, "0.45":3, "0.5":3, "0.55":3, "0.6":3, "0.7":3, "0.8":3, "0.9":3, "1":3, "1.2":3, "1.5":3, "2":4 },
+  width5ft: { "0.3":3, "0.35":3, "0.4":3, "0.45":3, "0.5":3, "0.55":3, "0.6":3, "0.7":1, "0.8":1, "0.9":1, "1":1, "1.2":1, "1.5":1, "2":1, "2.5":1, "3":1 },
+  width1m: { "0.3":1, "0.35":1, "0.4":1, "0.45":1, "0.5":1, "0.55":1, "0.6":1, "0.7":1, "0.8":1, "0.9":1, "1":1, "1.2":1, "1.5":1, "2":1, "2.5":1, "3":1 }
+};
+
+let SYNONYMS = {
+  width: [
+    { value: 1550, keywords: ["5'", "5尺", "5呎", "五尺", "五呎", "1550", "一五五零"] },
+    { value: 1220, keywords: ["4'", "4尺", "4呎", "四尺", "四呎", "1220", "一二二零"] },
+    { value: 1000, keywords: ["1米", "一米", "1000", "一千"] }
+  ],
+  surface: [
+    { value: "砂面", keywords: ["HLON", "HL", "砂面", "沙面", "拋砂", "毛絲面", "拉絲", "髮絲紋"] },
+    { value: "BA", keywords: ["BA", "B A", "逼A", "亮面", "鏡面"] },
+    { value: "2B", keywords: ["2B", "2 B", "二B", "兔B", "霧面"] }
+  ],
+  film: [
+    { value: "C6", keywords: ["雷射膜", "雷射", "光纖膜", "雙層膜", "C6", "C 6", "西六", "吸六", "希六"] },
+    { value: "C4", keywords: ["保護膜", "藍膜", "透明膜", "普通膜", "白膜", "C4", "C 4", "西四", "吸四", "希四"] },
+    { value: "不貼", keywords: ["不貼", "無膜", "素面", "不貼膜", "裸板"] }
+  ],
+  steel: [
+    { value: "NO1", keywords: ["NO1", "NO.1", "黑皮", "熱軋"] },
+    { value: "304", keywords: ["304", "SUS304", "三零四"] }
+  ]
+};
+
+async function loadExternalConfig() {
+  const statusEl = document.getElementById('status-msg');
+  try {
+    const res = await fetch('./config.json?v=' + Date.now());
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.priceRules) DB = cfg.priceRules;
+      if (cfg.synonyms) SYNONYMS = cfg.synonyms;
+      statusEl.innerText = "✅ 成功載入最新 config.json 設定檔";
+    } else {
+      statusEl.innerText = "ℹ️ 未檢測到 config.json，已載入內建預設設定";
+    }
+  } catch (err) {
+    statusEl.innerText = "ℹ️ 讀取外部設定失敗，已使用內建預設設定";
+    console.warn("使用預設資料庫:", err);
+  } finally {
+    initMobileTab();
+    initReverseTab();
+    runMobileCalc();
+    runReverseCalc();
+    renderRightCards();
+    setTimeout(() => {
+      if (!isVoiceRecording && !isProcessingVoice) {
+        statusEl.innerText = "可拍照或使用語音輸入，AI 自動辨識規格並計算報價";
+      }
+    }, 2500);
+  }
+}
+
+function generateSynonymsPrompt() {
+  let promptText = "同義詞與台灣工廠口語諧音對照規則：\n";
+
+  if (SYNONYMS.width) {
+    promptText += "1. 寬度：";
+    promptText += SYNONYMS.width.map(item => `${item.keywords.join('、')} -> ${item.value}`).join('；') + "（或具體毫米數字）\n";
+  }
+  if (SYNONYMS.surface) {
+    promptText += "2. 表面：";
+    promptText += SYNONYMS.surface.map(item => `${item.keywords.join('、')} -> "${item.value}"`).join('；') + "\n";
+  }
+  if (SYNONYMS.film) {
+    promptText += "3. 貼膜：";
+    promptText += SYNONYMS.film.map(item => `${item.keywords.join('、')} -> "${item.value}"`).join('；') + "\n";
+    promptText += "   【重要規則】如果判斷表面是「砂面」，但語音中完全沒提到貼膜或特別標註，請一律將貼膜預設為 \"C4\"。\n";
+  }
+  if (SYNONYMS.steel) {
+    promptText += "4. 鋼材：";
+    promptText += SYNONYMS.steel.map(item => `${item.keywords.join('、')} -> "${item.value}"`).join('；') + "\n";
+  }
+
+  return promptText;
+}
+
+let currentItems = [];
+let currentRawImage = null;
+
+function switchMainTab(tabId, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+  if (btn) btn.classList.add('active');
+  const targetPane = document.getElementById(tabId);
+  if (targetPane) targetPane.classList.add('active');
+
+  if (tabId === 'tab-phone') runMobileCalc();
+  if (tabId === 'tab-reverse') runReverseCalc();
+}
+
+function setApiKey() {
+  const currentKey = localStorage.getItem('GEMINI_API_KEY') || '';
+  const newKey = prompt("請貼上 Google AI Studio 申請的 Gemini API Key：", currentKey);
+  if (newKey !== null && newKey.trim() !== '') {
+    localStorage.setItem('GEMINI_API_KEY', newKey.trim());
+    alert("儲存成功！");
+  }
+}
+
+function calculateValues(thick, width, surface, film, base) {
+  const thickAdd = DB.thick2B[thick] || 0;
+  let widthAdd = 0;
+  if (width >= 1500 && width <= 1580) widthAdd = DB.width5ft[thick] || 0;
+  else if (width >= 1000 && width <= 1050) widthAdd = DB.width1m[thick] || 0;
+
+  let surfaceAdd = 0;
+  if (surface === "BA") surfaceAdd = DB.baSurface[thick] || 0;
+  else if (surface === "砂面") {
+    if (film === "C4") surfaceAdd = DB.sandC4[thick] || 0;
+    else if (film === "C6") surfaceAdd = DB.sandC6[thick] || 0;
+  }
+
+  let filmAdd = 0;
+  if (surface !== "砂面" && film !== "不貼") {
+    if (film === "C4") filmAdd = DB.baFilmC4[thick] || 0;
+    else if (film === "C6") filmAdd = DB.baFilmC6[thick] || 0;
+  }
+
+  const total = (base || 0) + thickAdd + widthAdd + surfaceAdd + filmAdd;
+  return { thickAdd, widthAdd, surfaceAdd, filmAdd, total };
+}
+
+// ========================================================
+// 語音與拍照強制中止機制 (AbortController) + 重設清空
+// ========================================================
+let mediaRecorder = null;
+let audioChunks = [];
+let isVoiceRecording = false;
+let audioStream = null;
+let isProcessingVoice = false;
+let currentAbortController = null; // 用於隨時強制切斷 API 請求
+
+function forceStopMediaStream() {
+  if (audioStream) {
+    try {
+      audioStream.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+    } catch (e) {
+      console.warn("釋放音訊軌道例外:", e);
+    }
+    audioStream = null;
+  }
+}
+
+// 強制中止所有正在進行的錄音與 AI 雲端辨識
+function abortAllOperations() {
+  // 1. 切斷正在進行的 Fetch 請求
+  if (currentAbortController) {
+    try { currentAbortController.abort(); } catch (e) {}
+    currentAbortController = null;
+  }
+
+  // 2. 停止錄音器且不觸發後續上傳
+  if (mediaRecorder) {
+    try {
+      mediaRecorder.ondataavailable = null;
+      mediaRecorder.onstop = null;
+      mediaRecorder.onerror = null;
+      if (mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    } catch (e) {}
+    mediaRecorder = null;
+  }
+
+  // 3. 徹底關閉麥克風硬體串流
+  forceStopMediaStream();
+  audioChunks = [];
+  isVoiceRecording = false;
+  isProcessingVoice = false;
+
+  // 4. 還原按鈕外觀
+  const btn = document.getElementById('voice-btn');
+  if (btn) {
+    btn.classList.remove('recording', 'processing');
+    btn.innerHTML = '🎙️ 點擊語音輸入 (Gemini AI)';
+  }
+}
+
+function resetPhotoTab() {
+  const wasBusy = isVoiceRecording || isProcessingVoice || (currentAbortController !== null);
+  
+  // 先無條件強制中止所有錄音與辨識程序
+  abortAllOperations();
+
+  // 如果畫面已有資料，詢問是否連同資料一起清空；若沒有資料（單純卡住想中止），直接完成中止
+  if (currentItems.length > 0 || currentRawImage) {
+    const msg = wasBusy
+      ? "已強制中止辨識！是否要一併清空畫面上的圖片與報價項次？"
+      : "確定要清空上傳的圖片與所有報價項次嗎？";
+    if (!confirm(msg)) {
+      document.getElementById('status-msg').innerText = "🛑 已強制中止辨識程序，保留現有項次。";
+      return;
+    }
+  }
+
+  currentItems = [];
+  currentRawImage = null;
+  document.getElementById('camera-input').value = '';
+  document.getElementById('global-base').value = '73';
+
+  document.getElementById('image-wrapper').style.display = 'none';
+  document.getElementById('preview-img').src = '';
+  document.getElementById('placeholder-text').style.display = 'block';
+  document.getElementById('badges-container').innerHTML = '';
+
+  document.getElementById('status-msg').innerText = wasBusy
+    ? "🛑 已強制中止辨識並重設清空！"
+    : "已重設清空。請拍照上傳單據或使用語音輸入。";
+  renderAllPhotoTab();
+}
+
+function resetMobileTab() {
+  document.getElementById('m-base').value = '73';
+  document.getElementById('m-width-custom').value = '';
+  mobileState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
+
+  initMobileTab();
+  updateButtonSelection('#m-width-grid', '5尺');
+  updateButtonSelection('#m-surface-grid', '砂面');
+  updateButtonSelection('#m-film-grid', 'C4');
+
+  runMobileCalc();
+}
+
+function resetReverseTab() {
+  document.getElementById('r-price').value = '82';
+  reverseState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
+
+  initReverseTab();
+  updateButtonSelection('#r-width-grid', '5尺');
+  updateButtonSelection('#r-surface-grid', '砂面');
+  updateButtonSelection('#r-film-grid', 'C4');
+
+  runReverseCalc();
+}
+
+function updateButtonSelection(containerSelector, keyword) {
+  document.querySelectorAll(`${containerSelector} .chip-btn`).forEach(b => {
+    b.classList.toggle('selected', b.innerText.includes(keyword));
+  });
+}
+
+// ========================================================
+// 高精準度 Gemini 雲端語音模組
+// ========================================================
+async function toggleVoiceInput() {
+  const btn = document.getElementById('voice-btn');
+  const statusEl = document.getElementById('status-msg');
+  const apiKey = (localStorage.getItem('GEMINI_API_KEY') || '').trim();
+
+  if (!apiKey) {
+    alert("請先點選右上角『⚙️ API Key』輸入您的 Key！");
+    setApiKey();
+    return;
+  }
+
+  // 若正在等待雲端 API 回應，再次點擊按鈕可直接強制中止
+  if (isProcessingVoice) {
+    abortAllOperations();
+    statusEl.innerText = "🛑 已手動中止雲端語音辨識，可重新點擊錄音";
+    return;
+  }
+
+  // 若正在錄音中 -> 點擊完成錄音並送出辨識
+  if (isVoiceRecording) {
+    isVoiceRecording = false;
+    btn.classList.remove('recording');
+    btn.classList.add('processing');
+    btn.innerHTML = '⏳ 辨識中... (點擊可中止)';
+    statusEl.innerText = '🤖 錄音完成，正在由 Gemini 雲端 AI 進行高精準度語音解析...';
+    isProcessingVoice = true;
+
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      try { mediaRecorder.stop(); } catch (err) { console.warn("停止錄音異常:", err); }
+    }
+    return;
+  }
+
+  // 啟動全新錄音前先確保乾淨狀態
+  abortAllOperations();
+
+  try {
+    // 提高音訊採樣品質，幫助 AI 聽清楚 C4 / C6 / 數字小數點
+    audioStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        channelCount: 1,
+        sampleRate: 48000
+      }
+    });
+
+    let mimeType = '';
+    if (typeof MediaRecorder !== 'undefined') {
+      if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+      else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
+      else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+      else if (MediaRecorder.isTypeSupported('audio/aac')) mimeType = 'audio/aac';
+    }
+
+    const recorderOptions = mimeType
+      ? { mimeType, audioBitsPerSecond: 128000 }
+      : { audioBitsPerSecond: 128000 };
+
+    mediaRecorder = new MediaRecorder(audioStream, recorderOptions);
+
+    mediaRecorder.ondataavailable = event => {
+      if (event.data && event.data.size > 0) audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = async () => {
+      forceStopMediaStream();
+      const finalMime = (mediaRecorder && mediaRecorder.mimeType) ? mediaRecorder.mimeType : 'audio/mp4';
+      const audioBlob = new Blob(audioChunks, { type: finalMime });
+      audioChunks = [];
+
+      if (audioBlob.size < 800) {
+        statusEl.innerText = "❌ 錄音時間過短或未收錄到聲音，請再試一次";
+        abortAllOperations();
+        return;
+      }
+
+      try {
+        const base64Audio = await blobToBase64(audioBlob);
+        const mimeClean = finalMime.split(';')[0] || 'audio/mp4';
+        await processAudioWithGemini(base64Audio, mimeClean, apiKey);
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          statusEl.innerText = "🛑 已強制中止語音辨識";
+        } else {
+          statusEl.innerText = `❌ 語音辨識失敗 (${err.message})，請再試一次或點擊重設`;
+          console.error(err);
+        }
+      } finally {
+        abortAllOperations();
+      }
+    };
+
+    mediaRecorder.onerror = err => {
+      console.error("MediaRecorder 錯誤:", err);
+      abortAllOperations();
+      statusEl.innerText = "❌ 錄音發生異常，已自動重設";
+    };
+
+    // 每 200ms 切片收音一次，防止手機端結尾吞字
+    mediaRecorder.start(200);
+    isVoiceRecording = true;
+    btn.classList.add('recording');
+    btn.innerHTML = '🛑 點擊【完成錄音】';
+    statusEl.innerText = '🎙️ 正在聆聽中... 請說出「厚度、寬度、表面、貼膜、BASE」，講完點擊完成（或點重設中止）';
+
+  } catch (err) {
+    console.error("麥克風存取失敗:", err);
+    abortAllOperations();
+    alert("無法存取麥克風，請確認瀏覽器已允許麥克風權限！");
+    statusEl.innerText = "❌ 麥克風啟動失敗，請確認權限或重新整理網頁";
+  }
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result;
+      const base64 = dataUrl.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function processAudioWithGemini(base64Audio, mimeType, apiKey) {
+  const statusEl = document.getElementById('status-msg');
+  const globalBase = parseFloat(document.getElementById('global-base').value) || 73;
+
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
+  const prompt = `你是一位台灣不鏽鋼鋼捲報價專家。請仔細聆聽這段台灣口音的中文語音，提取鋼捲規格參數。
+使用者通常會依序說出：「厚度、寬度、表面、貼膜、BASE基價」（順序可能對調或省略部分項目）。
+
+【極重要：台灣工廠口語與諧音強制校正規則】
+1. 有效厚度清單僅限：[${DB.thickList.join(', ')}]。
+   - 口語「一點五 / 1.5」-> "1.5"；「一點二 / 1.2」-> "1.2"；「零點八 / 0.8」-> "0.8"；「兩ミリ / 二毫米 / 厚2」-> "2"。
+2. 寬度 (width)：
+   - 口語「五尺 / 5尺 / 5呎 / 5' / 一五五零」-> 1550
+   - 口語「四尺 / 4尺 / 4呎 / 4' / 一二二零」-> 1220
+   - 口語「一米 / 1米 / 一千」-> 1000
+   - 若說出 900~1600 之間的具體四位數則直接採用該數字；若未提及寬度，預設為 1220。
+3. 表面 (surface) 僅限 "砂面"、"BA"、"2B" 三種：
+   - 聽到「砂面 / 沙面 / HL / HLON / 拋砂 / 毛絲 / 拉絲」-> "砂面"
+   - 聽到「BA / B A / 逼A / 亮面」-> "BA"
+   - 聽到「2B / 二B / 兔B / 霧面」-> "2B"
+4. 貼膜 (film) 僅限 "C4"、"C6"、"不貼" 三種：
+   - 聽到「C4 / 西四 / 吸四 / 希四 / 保護膜 / 藍膜 / 普通膜」-> "C4"
+   - 聽到「C6 / 西六 / 吸六 / 希六 / 雷射膜 / 雷射 / 光纖膜」-> "C6"
+   - 聽到「不貼 / 無膜 / 素面」-> "不貼"
+   - 【鐵則】若表面為「砂面」且語音未明確說「不貼」或「C6」，貼膜一律預設為 "C4"。
+5. BASE 基價 (base)：
+   - 聽到「BASE / 貝斯 / 背司 / 基價 / 底價」後方的兩位數（通常介於 50~120，可含 .5 小數），或是語音最後單獨出現的 50~120 數字，即為 base。若未提及則填 ${globalBase}。
+
+${generateSynonymsPrompt()}
+
+請直接回傳純 JSON 物件（不要加 markdown 語法）：
+{"steel": "304", "thick": "1.5", "width": 1550, "surface": "砂面", "film": "C4", "base": ${globalBase}, "spoken_text": "轉錄並校正後的文字"}`;
+
+  // 第一優先：gemini-4-carbon，第二備援：gemini-3.8-flash，第三備援：gemini-3.5-flash-lite
+  const candidateModels = ['gemini-4-carbon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+  let resData = null;
+  let lastError = null;
+
+  for (const model of candidateModels) {
+    if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+    try {
+      statusEl.innerText = `⏳ 正在透過 Gemini (${model}) 解析語音（點「重設清空」可隨時中止）...`;
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: signal,
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: mimeType, data: base64Audio } }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.candidates && data.candidates[0]) {
+        resData = data;
+        break;
+      } else {
+        lastError = data.error ? `${data.error.code}: ${data.error.message}` : `HTTP ${response.status}`;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+      lastError = err.message;
+    }
+  }
+
+  if (!resData) throw new Error(`雲端辨識未成功 (${lastError})`);
+
+  const aiText = resData.candidates[0].content.parts[0].text;
+  const cleanJson = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+  let parsed = JSON.parse(cleanJson);
+  if (Array.isArray(parsed)) parsed = parsed[0];
+
+  let tStr = parseFloat(parsed.thick || "1").toString();
+  if (!DB.thickList.includes(tStr)) tStr = "1";
+
+  const surface = ["砂面", "BA", "2B"].includes(parsed.surface) ? parsed.surface : "BA";
+  let film = ["C4", "C6", "不貼"].includes(parsed.film) ? parsed.film : "不貼";
+  if (surface === "砂面" && (!parsed.film || parsed.film === "不貼")) {
+    film = "C4";
+  }
+
+  const baseVal = parseFloat(parsed.base) || globalBase;
+  if (parsed.base) {
+    document.getElementById('global-base').value = baseVal;
+  }
+
+  currentItems.push({
+    steel: parsed.steel || "304",
+    thick: tStr,
+    width: parseInt(parsed.width) || 1220,
+    surface: surface,
+    film: film,
+    base: baseVal,
+    y_percent: null
+  });
+
+  statusEl.innerText = `✅ 語音辨識成功！「${parsed.spoken_text || ''}」➔ 項次 #${currentItems.length}：${tStr}mm / ${parsed.width || 1220}寬 / ${surface} / ${film} / BASE:${baseVal}`;
+  renderAllPhotoTab();
+}
+
+// ----------------- 分頁 1 局部渲染 -----------------
+function renderAllPhotoTab() {
+  renderRightCards();
+  renderImageBadges();
+}
+
+function renderRightCards() {
+  const panel = document.getElementById('quote-results-panel');
+  panel.innerHTML = '';
+
+  if (currentItems.length === 0) {
+    panel.innerHTML = '<div class="empty-card-box">尚未有項次，請上傳照片或點擊「🎙️ 點擊語音輸入」</div>';
+    return;
+  }
+
+  currentItems.forEach((item, index) => {
+    const calc = calculateValues(item.thick, item.width, item.surface, item.film, item.base);
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+      <div class="item-header">
+        <span class="item-title">項次 #${index + 1} (${item.steel || '304'})</span>
+        <span class="item-total-badge" id="card-total-${index}">總報價：${calc.total} 元</span>
+      </div>
+      <div class="item-grid">
+        <div class="grid-cell">
+          <span>BASE 基價</span>
+          <input type="number" step="0.5" value="${item.base}" oninput="updateItemField(${index}, 'base', this.value)">
+        </div>
+        <div class="grid-cell">
+          <span>厚度 (mm)</span>
+          <select onchange="updateItemField(${index}, 'thick', this.value)">
+            ${DB.thickList.map(t => `<option value="${t}" ${t === item.thick ? 'selected' : ''}>${t}</option>`).join('')}
+          </select>
+          <div class="cell-add-val" id="add-thick-${index}">+${calc.thickAdd}</div>
+        </div>
+        <div class="grid-cell">
+          <span>寬度 (mm)</span>
+          <input type="number" value="${item.width}" oninput="updateItemField(${index}, 'width', this.value)">
+          <div class="cell-add-val" id="add-width-${index}">+${calc.widthAdd}</div>
+        </div>
+        <div class="grid-cell">
+          <span>表面</span>
+          <select id="sel-surface-${index}" onchange="handleSurfaceChange(${index}, this.value)">
+            <option value="BA" ${item.surface === 'BA' ? 'selected' : ''}>BA</option>
+            <option value="2B" ${item.surface === '2B' ? 'selected' : ''}>2B</option>
+            <option value="砂面" ${item.surface === '砂面' ? 'selected' : ''}>砂面</option>
+          </select>
+          <div class="cell-add-val" id="add-surface-${index}">+${calc.surfaceAdd}</div>
+        </div>
+        <div class="grid-cell">
+          <span>貼膜種類</span>
+          <select id="sel-film-${index}" onchange="updateItemField(${index}, 'film', this.value)">
+            <option value="C4" ${item.film === 'C4' ? 'selected' : ''}>C4</option>
+            <option value="C6" ${item.film === 'C6' ? 'selected' : ''}>C6</option>
+            <option value="不貼" ${item.film === '不貼' ? 'selected' : ''}>不貼</option>
+          </select>
+          <div class="cell-add-val" id="add-film-${index}">+${calc.filmAdd}</div>
+        </div>
+      </div>
+    `;
+    panel.appendChild(card);
+  });
+}
+
+function updateItemField(index, field, value) {
+  currentItems[index][field] = value;
+  const item = currentItems[index];
+  const calc = calculateValues(item.thick, item.width, item.surface, item.film, item.base);
+
+  const totalEl = document.getElementById(`card-total-${index}`);
+  if (totalEl) totalEl.innerText = `總報價：${calc.total} 元`;
+
+  const addThick = document.getElementById(`add-thick-${index}`);
+  if (addThick) addThick.innerText = `+${calc.thickAdd}`;
+
+  const addWidth = document.getElementById(`add-width-${index}`);
+  if (addWidth) addWidth.innerText = `+${calc.widthAdd}`;
+
+  const addSurface = document.getElementById(`add-surface-${index}`);
+  if (addSurface) addSurface.innerText = `+${calc.surfaceAdd}`;
+
+  const addFilm = document.getElementById(`add-film-${index}`);
+  if (addFilm) addFilm.innerText = `+${calc.filmAdd}`;
+
+  renderImageBadges();
+}
+
+function handleSurfaceChange(index, newSurface) {
+  currentItems[index].surface = newSurface;
+  if (newSurface === '砂面' && currentItems[index].film === '不貼') {
+    currentItems[index].film = 'C4';
+    const filmSel = document.getElementById(`sel-film-${index}`);
+    if (filmSel) filmSel.value = 'C4';
+  }
+  updateItemField(index, 'surface', newSurface);
+}
+
+function renderImageBadges() {
+  const container = document.getElementById('badges-container');
+  container.innerHTML = '';
+
+  currentItems.forEach((item, index) => {
+    const calc = calculateValues(item.thick, item.width, item.surface, item.film, item.base);
+    const yPercent = (item.y_percent !== undefined && item.y_percent !== null)
+      ? item.y_percent
+      : Math.round(((index + 1) / (currentItems.length + 1)) * 100);
+
+    const badge = document.createElement('div');
+    badge.className = 'price-overlay-badge';
+    badge.style.top = `${yPercent}%`;
+    badge.innerHTML = `@${calc.total}`;
+    container.appendChild(badge);
+  });
+}
+
+function updateAllItemsBase(val) {
+  const num = parseFloat(val) || 0;
+  currentItems.forEach((item, idx) => {
+    item.base = num;
+    updateItemField(idx, 'base', num);
+  });
+}
+
+function addNewManualItem() {
+  const globalBase = parseFloat(document.getElementById('global-base').value) || 73;
+  currentItems.push({
+    steel: "304", thick: "1.5", width: 1220, surface: "BA", film: "C4", base: globalBase, y_percent: null
+  });
+  renderAllPhotoTab();
+}
+
+// ----------------- 相機與 AI 核心 -----------------
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = event => {
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 1400;
+        let width = img.width;
+        let height = img.height;
+        if (width > height && width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ dataUrl, base64: dataUrl.split(',')[1] });
+      };
+      img.onerror = err => reject(err);
+      img.src = event.target.result;
+    };
+    reader.onerror = err => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function callGeminiApi(modelName, apiKey, prompt, base64Data, signal) {
+  return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    signal: signal,
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { text: prompt },
+          { inline_data: { mime_type: "image/jpeg", data: base64Data } }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    })
+  });
+}
+
+async function handleImageUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const apiKey = (localStorage.getItem('GEMINI_API_KEY') || '').trim();
+  const statusEl = document.getElementById('status-msg');
+
+  if (!apiKey) {
+    alert("請先點選右上角『⚙️ API Key』輸入您的 Key！");
+    setApiKey();
+    return;
+  }
+
+  abortAllOperations();
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
+  statusEl.innerText = "⏳ 正在處理相片...";
+
+  try {
+    const { dataUrl, base64 } = await compressImage(file);
+    currentRawImage = dataUrl;
+
+    const imgEl = document.getElementById('preview-img');
+    const phEl = document.getElementById('placeholder-text');
+    const wrapper = document.getElementById('image-wrapper');
+    
+    imgEl.src = dataUrl;
+    wrapper.style.display = 'inline-block';
+    phEl.style.display = 'none';
+
+    statusEl.innerText = "🤖 Gemini AI 正在辨識多項次規格與位置...";
+    const globalBase = parseFloat(document.getElementById('global-base').value) || 73;
+
+    const prompt = `你是一位鋼材報價專家。請分析這張照片（工令單、出貨單、手寫單或標籤），提取所有規格項次。
+對於每個項次，請估算該行規格文字在圖片整體垂直高度的百分比位置（y_percent，數值為 5 到 95 之間的整數）。
+
+${generateSynonymsPrompt()}
+
+回傳格式必須且僅為純 JSON 陣列（若只有一筆也請用陣列包裝，不要包含任何 markdown 標記）：
+[
+  {"steel": "304", "thick": "1.5", "width": 1550, "surface": "砂面", "film": "C4", "y_percent": 30}
+]`;
+
+    // 第一優先：gemini-4-carbon，第二備援：gemini-3.8-flash，第三備援：gemini-3.5-flash-lite
+    const candidateModels = ['gemini-4-carbon', 'gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+    let resData = null;
+    let lastError = null;
+
+    for (const model of candidateModels) {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      try {
+        statusEl.innerText = `⏳ 正在透過 AI (${model}) 分析規格與位置（點「重設清空」可中止）...`;
+        const response = await callGeminiApi(model, apiKey, prompt, base64, signal);
+        const data = await response.json();
+        if (response.ok && data.candidates && data.candidates[0]) {
+          resData = data;
+          break;
+        } else {
+          lastError = data.error ? `${data.error.code}: ${data.error.message}` : `HTTP ${response.status}`;
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') throw err;
+        lastError = err.message;
+      }
+    }
+
+    if (!resData) throw new Error(`AI 解析未成功 (${lastError})，請稍候再試`);
+
+    const aiText = resData.candidates[0].content.parts[0].text;
+    const cleanJson = aiText.replace(/```json/gi, '').replace(/```/g, '').trim();
+    let parsedList = JSON.parse(cleanJson);
+    if (!Array.isArray(parsedList)) parsedList = [parsedList];
+
+    currentItems = parsedList.map(item => {
+      let tStr = parseFloat(item.thick).toString();
+      if (!DB.thickList.includes(tStr)) tStr = "1";
+      const surface = item.surface || "BA";
+      let film = item.film || "不貼";
+      if (surface === "砂面" && (!item.film || item.film === "不貼")) film = "C4";
+
+      return {
+        steel: item.steel || "304",
+        thick: tStr,
+        width: item.width || 1220,
+        surface: surface,
+        film: film,
+        base: globalBase,
+        y_percent: item.y_percent || null
+      };
+    });
+
+    statusEl.innerText = `✅ 辨識完成！已於左側原圖最右方標上 @數字，共 ${currentItems.length} 項`;
+    renderAllPhotoTab();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      statusEl.innerText = "🛑 已強制中止圖片辨識";
+    } else {
+      statusEl.innerText = `❌ ${err.message}`;
+      console.error(err);
+    }
+  } finally {
+    currentAbortController = null;
+  }
+}
+
+function downloadAnnotatedImage() {
+  if (!currentRawImage || currentItems.length === 0) {
+    alert("尚未上傳圖片或無計算項次！");
+    return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+
+    const fontSize = Math.max(24, Math.round(img.width * 0.038));
+    ctx.font = `bold ${fontSize}px sans-serif`;
+
+    currentItems.forEach((item, index) => {
+      const calc = calculateValues(item.thick, item.width, item.surface, item.film, item.base);
+      const text = ` @${calc.total} `;
+      const textWidth = ctx.measureText(text).width;
+
+      const yPercent = (item.y_percent !== undefined && item.y_percent !== null)
+        ? item.y_percent
+        : Math.round(((index + 1) / (currentItems.length + 1)) * 100);
+
+      const y = (yPercent / 100) * img.height;
+      const x = img.width - textWidth - (img.width * 0.03);
+
+      ctx.fillStyle = "rgba(229, 57, 53, 0.95)";
+      const padding = fontSize * 0.45;
+      ctx.beginPath();
+      ctx.roundRect(x - 4, y - fontSize + 2, textWidth + 8, fontSize + padding, 12);
+      ctx.fill();
+
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, x, y);
+    });
+
+    const link = document.createElement('a');
+    link.download = `鋼捲報價單_最新調整_${Date.now()}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.click();
+  };
+  img.src = currentRawImage;
+}
+
+// ----------------- 分頁 2 & 3 初始化 -----------------
+let mobileState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
+let reverseState = { thick: "1.5", width: 1550, surface: "砂面", film: "C4" };
+
+function initMobileTab() {
+  const thickGrid = document.getElementById('m-thick-grid');
+  if (!thickGrid) return;
+  thickGrid.innerHTML = '';
+  DB.thickList.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = `chip-btn ${t === mobileState.thick ? 'selected' : ''}`;
+    btn.innerText = t;
+    btn.onclick = () => {
+      document.querySelectorAll('#m-thick-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      mobileState.thick = t;
+      runMobileCalc();
+    };
+    thickGrid.appendChild(btn);
+  });
+}
+
+function selectMobileWidth(w, btn) {
+  document.querySelectorAll('#m-width-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('m-width-custom').value = '';
+  mobileState.width = w;
+  runMobileCalc();
+}
+
+function selectCustomWidth(val) {
+  const w = parseFloat(val);
+  if (w) {
+    document.querySelectorAll('#m-width-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+    mobileState.width = w;
+    runMobileCalc();
+  }
+}
+
+function selectMobileSurface(s, btn) {
+  document.querySelectorAll('#m-surface-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  mobileState.surface = s;
+  
+  if (s === "砂面" && mobileState.film === "不貼") {
+    mobileState.film = "C4";
+    document.querySelectorAll('#m-film-grid .chip-btn').forEach(b => {
+      b.classList.toggle('selected', b.innerText.includes("C4"));
+    });
+  }
+  runMobileCalc();
+}
+
+function selectMobileFilm(f, btn) {
+  document.querySelectorAll('#m-film-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  mobileState.film = f;
+  runMobileCalc();
+}
+
+function runMobileCalc() {
+  const base = parseFloat(document.getElementById('m-base').value) || 0;
+  const { thickAdd, widthAdd, surfaceAdd, filmAdd, total } = calculateValues(
+    mobileState.thick, mobileState.width, mobileState.surface, mobileState.film, base
+  );
+
+  document.getElementById('m-res-base').innerText = base;
+  document.getElementById('m-res-thick').innerText = `+${thickAdd}`;
+  document.getElementById('m-res-width').innerText = `+${widthAdd}`;
+  document.getElementById('m-res-surface').innerText = `+${surfaceAdd}`;
+  document.getElementById('m-res-film').innerText = `+${filmAdd}`;
+  document.getElementById('m-res-total').innerText = total;
+}
+
+function initReverseTab() {
+  const thickGrid = document.getElementById('r-thick-grid');
+  if (!thickGrid) return;
+  thickGrid.innerHTML = '';
+  DB.thickList.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = `chip-btn ${t === reverseState.thick ? 'selected' : ''}`;
+    btn.innerText = t;
+    btn.onclick = () => {
+      document.querySelectorAll('#r-thick-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      reverseState.thick = t;
+      runReverseCalc();
+    };
+    thickGrid.appendChild(btn);
+  });
+}
+
+function selectReverseWidth(w, btn) {
+  document.querySelectorAll('#r-width-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  reverseState.width = w;
+  runReverseCalc();
+}
+
+function selectReverseSurface(s, btn) {
+  document.querySelectorAll('#r-surface-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  reverseState.surface = s;
+  if (s === "砂面" && reverseState.film === "不貼") {
+    reverseState.film = "C4";
+    document.querySelectorAll('#r-film-grid .chip-btn').forEach(b => {
+      b.classList.toggle('selected', b.innerText.includes("C4"));
+    });
+  }
+  runReverseCalc();
+}
+
+function selectReverseFilm(f, btn) {
+  document.querySelectorAll('#r-film-grid .chip-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  reverseState.film = f;
+  runReverseCalc();
+}
+
+function runReverseCalc() {
+  const targetPrice = parseFloat(document.getElementById('r-price').value) || 0;
+  const { thickAdd, widthAdd, surfaceAdd, filmAdd } = calculateValues(
+    reverseState.thick, reverseState.width, reverseState.surface, reverseState.film, 0
+  );
+  const base = targetPrice - thickAdd - widthAdd - surfaceAdd - filmAdd;
+
+  document.getElementById('r-res-price').innerText = targetPrice;
+  document.getElementById('r-res-thick').innerText = `-${thickAdd}`;
+  document.getElementById('r-res-width').innerText = `-${widthAdd}`;
+  document.getElementById('r-res-surface').innerText = `-${surfaceAdd}`;
+  document.getElementById('r-res-film').innerText = `-${filmAdd}`;
+  document.getElementById('r-res-base').innerText = base;
+}
+
+// 頁面初始化
+initTheme();
+loadExternalConfig();
+</script>
+</body>
+</html>
